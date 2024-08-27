@@ -6,7 +6,11 @@ import cookieParser from "cookie-parser";
 const app = express();
 
 // Define allowed origins
-const allowedOrigins = ["http://localhost:5173", "http://localhost:5174"];
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://alpha-adventures-client.vercel.app",
+];
 
 // Configure CORS options
 const corsOptions = {
