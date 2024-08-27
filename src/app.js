@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 
+// Create Express app
 const app = express();
 
 // Define allowed origins
@@ -13,6 +14,7 @@ const allowedOrigins = [
 // Configure CORS options
 const corsOptions = {
   origin: (origin, callback) => {
+    console.log("Evaluating origin:", origin); // Debugging line
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       // Allow requests with no origin (like mobile apps or curl requests)
       callback(null, true);
@@ -40,7 +42,7 @@ import trekGuideRouter from "./routes/trekguide.routes.js";
 import trekTypeRouter from "./routes/trektype.routes.js";
 import trekRouter from "./routes/trek.routes.js";
 import testimonialRouter from "./routes/testimonial.routes.js";
-//
+
 // Route declarations
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/trekguide", trekGuideRouter);
@@ -51,6 +53,12 @@ app.use("/api/v1/testimonial", testimonialRouter);
 // Test route
 app.get("/connect", (req, res) => {
   res.send("Trek types data");
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something broke!");
 });
 
 export { app };
