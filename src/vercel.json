@@ -5,19 +5,22 @@
       "src": "./index.js",
       "use": "@vercel/node",
       "config": {
-        "nodeVersion": "16.x"
+        "nodeVersion": "18.x"
       }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/"
     }
   ],
   "build": {
     "env": {
       "NODE_ENV": "production"
+    },
+    "commands": {
+      "build": "npm run build"
     }
-  }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ]
 }
