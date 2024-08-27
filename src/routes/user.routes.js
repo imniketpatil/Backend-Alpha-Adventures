@@ -19,11 +19,11 @@ router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
 
 //* Secured Routes
-router.route("/currentuser").get(verifyJWT, getCurrentUser);
-router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/currentuser").get(getCurrentUser);
+router.route("/logout").post(logoutUser);
 router.route("/refresh-token").post(refreshAccessToken);
-router.route("/edit-user").patch(verifyJWT, updateAccountDetails);
-router.route("/change-password").patch(verifyJWT, changeCurrentPassword);
-router.route("/delete-user").delete(verifyJWT, deleteAccount);
+router.route("/edit-user").patch(updateAccountDetails);
+router.route("/change-password").patch(changeCurrentPassword);
+router.route("/delete-user").delete(deleteAccount);
 
 export default router;

@@ -20,7 +20,11 @@ const corsOptions = {
   },
   methods: ["GET", "POST", "PATCH", "DELETE"], // Specify allowed HTTP methods
   credentials: true, // Allow cookies and other credentials to be sent
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Access-Control-Allow-Origin",
+  ],
 };
 
 app.use(cors(corsOptions));
