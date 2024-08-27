@@ -7,8 +7,8 @@ const app = express();
 
 // Define allowed origins
 const allowedOrigins = [
-  "https://alpha-adventures-client.onrender.com",
-  "https://alpha-adventures-admin.onrender.com",
+  "http://localhost:5173/alpha-adventures",
+  "http://localhost:5174",
 ];
 
 // Configure CORS options
