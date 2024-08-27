@@ -10,6 +10,8 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://alpha-adventures-client-2cte3wieo-niket-patils-projects.vercel.app",
+  "https://alpha-adventures-client.vercel.app",
+  "https://alpha-adventures-client-git-main-niket-patils-projects.vercel.app",
 ];
 
 // Configure CORS options
