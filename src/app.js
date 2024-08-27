@@ -40,7 +40,7 @@ import trekGuideRouter from "./routes/trekguide.routes.js";
 import trekTypeRouter from "./routes/trektype.routes.js";
 import trekRouter from "./routes/trek.routes.js";
 import testimonialRouter from "./routes/testimonial.routes.js";
-
+//
 // Route declarations
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/trekguide", trekGuideRouter);
