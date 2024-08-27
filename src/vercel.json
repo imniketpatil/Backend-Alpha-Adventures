@@ -5,18 +5,10 @@
       "src": "./index.js",
       "use": "@vercel/node",
       "config": {
-        "nodeVersion": "18.x"
+        "nodeVersion": "20.x"
       }
     }
   ],
-  "build": {
-    "env": {
-      "NODE_ENV": "production"
-    },
-    "commands": {
-      "build": "npm run build"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",

@@ -1,7 +1,7 @@
 {
   "name": "alpha-adventures-backend",
   "version": "1.0.0",
-  "description": "Creating a backed for a Treking website For Alpha Adventures",
+  "description": "Creating a backend for a Trekking website For Alpha Adventures",
   "main": "index.js",
   "type": "module",
   "scripts": {
