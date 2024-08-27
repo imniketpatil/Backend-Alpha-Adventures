@@ -45,4 +45,8 @@ app.use("/api/v1/trek", trekRouter);
 
 app.use("/api/v1/testimonial", testimonialRouter);
 
+app.get("/connect", (req, res) => {
+  res.send("Trek types data");
+});
+
 export { app };
