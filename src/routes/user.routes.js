@@ -19,7 +19,7 @@ router.route("/register").post(verifyJWT, registerUser);
 router.route("/login").post(loginUser);
 
 //* Secured Routes
-router.route("/currentuser").get(getCurrentUser);
+router.route("/currentuser").get(verifyJWT, getCurrentUser);
 router.route("/logout").post(verifyJWT, logoutUser);
 router.route("/refresh-token").post(refreshAccessToken);
 router.route("/edit-user").patch(verifyJWT, updateAccountDetails);
