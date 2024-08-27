@@ -111,16 +111,19 @@ const deleteTestimonial = asyncHandler(async (req, res) => {
 });
 
 const getAllTestimonials = asyncHandler(async (req, res) => {
-  const testimonial = await Testimonial.find();
+  const testimonials = await Testimonial.find();
 
-  if (!testimonial || testimonial.length === 0) {
-    throw new ApiError(404, "No Trek Type Found");
+  // Check if there are no testimonials
+  if (testimonials.length === 0) {
+    return res
+      .status(200) // Still return a 200 OK status
+      .json(new ApiResponse(200, [], "No Testimonials Found")); // Return an empty array and a custom message
   }
 
   return res
     .status(200)
     .json(
-      new ApiResponse(200, testimonial, "Trek Type Retrieved Successfully")
+      new ApiResponse(200, testimonials, "Testimonials Retrieved Successfully")
     );
 });
 
