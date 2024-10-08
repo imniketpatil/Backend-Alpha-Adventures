@@ -30,6 +30,7 @@ const getAllTreks = asyncHandler(async (req, res) => {
           altitude: 1,
           trekLocation: 1,
           trekDescription: 1,
+          subDescription: 1,
           trekInfo: 1,
           trekHighlights: 1,
           trekInclusions: 1,
@@ -67,6 +68,7 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
           as: "trekTypeDetails",
         },
       },
+      { $unwind: "$trekTypeDetails" }, // Unwind as we expect one trekType per trek
       {
         $lookup: {
           from: "trekdates",
@@ -75,12 +77,7 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
           as: "dateDetails",
         },
       },
-      // {
-      //   $unwind: {
-      //     path: "$dateDetails",
-      //     preserveNullAndEmptyArrays: true,
-      //   },
-      // },
+      { $unwind: "$dateDetails" }, // Unwind as we expect one date per trek
       {
         $lookup: {
           from: "prices",
@@ -89,12 +86,7 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
           as: "priceDetails",
         },
       },
-      // {
-      //   $unwind: {
-      //     path: "$priceDetails",
-      //     preserveNullAndEmptyArrays: true,
-      //   },
-      // },
+      { $unwind: "$priceDetails" }, // Unwind as we expect one price per date
       {
         $lookup: {
           from: "trektimelines",
@@ -103,12 +95,7 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
           as: "trekTimelineDetails",
         },
       },
-      // {
-      //   $unwind: {
-      //     path: "$trekTimelineDetails",
-      //     preserveNullAndEmptyArrays: true,
-      //   },
-      // },
+      { $unwind: "$trekTimelineDetails" }, // Unwind as we expect one timeline per trek
       {
         $project: {
           trekName: 1,
@@ -116,9 +103,9 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
           suitableForAge: 1,
           altitude: 1,
           trekLocation: 1,
-          trekLocation: 1,
           trekHighlights: 1,
           trekDescription: 1,
+          subDescription: 1,
           trekInfo: 1,
           trekInclusions: 1,
           trekExclusions: 1,
@@ -129,7 +116,7 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
           trekTypeDescription: "$trekTypeDetails.description",
           startDate: "$dateDetails.startDate",
           endDate: "$dateDetails.endDate",
-          // price: "$priceDetails._id",
+          price: "$priceDetails._id",
           withTravel: "$priceDetails.withTravel",
           withoutTravel: "$priceDetails.withoutTravel",
           scheduleTimeline: "$trekTimelineDetails.scheduleTimeline",
@@ -145,7 +132,7 @@ const getTreksDetailsById = asyncHandler(async (req, res) => {
       .status(200)
       .json(new ApiResponse(200, result[0], "Trek successfully fetched"));
   } catch (error) {
-    console.error("Error fetching trek data for admin:", error);
+    console.error("Error fetching trek data:", error);
     throw new ApiError(500, "An error occurred while fetching the trek data");
   }
 });

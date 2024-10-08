@@ -9,6 +9,7 @@ const TrekSchema = new Schema({
   altitude: { type: Number, required: false },
   trekLocation: { type: String, required: false },
   trekDescription: { type: String, required: false },
+  subDescription: [{ descTitle: { type: String }, desc: { type: String } }],
   trekInfo: [{ type: String, required: false }],
   trekHighlights: [{ type: String, required: false }],
   trekInclusions: [{ type: String, required: false }],

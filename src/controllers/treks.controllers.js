@@ -18,6 +18,7 @@ const addTrek = asyncHandler(async (req, res) => {
     altitude,
     trekLocation,
     trekDescription,
+    subDescription,
     trekInfo,
     trekHighlights,
     trekType,
@@ -26,20 +27,15 @@ const addTrek = asyncHandler(async (req, res) => {
     trekCancellationPolicy,
     startDate,
     endDate,
-    withTravelDescription,
-    withTravelFrom,
-    withTravelTo,
-    withTravelPrice,
-    withoutTravelDescription,
-    withoutTravelFrom,
-    withoutTravelTo,
-    withoutTravelPrice,
+    withTravel, // Extracted directly from req.body
+    withoutTravel, // Extracted directly from req.body
     scheduleTimeline, // Expecting an array of { day, time, work } objects
   } = req.body;
 
   // Debug logging
   console.log("Received scheduleTimeline:", scheduleTimeline);
 
+  // Extract and validate uploaded images
   const trekImageLocalPaths = req.files?.trekImage?.map((file) => file.path);
   console.log("Local image paths:", trekImageLocalPaths);
 
@@ -58,38 +54,40 @@ const addTrek = asyncHandler(async (req, res) => {
       throw new ApiError(400, "One or more image files didn't upload");
     }
 
+    // Handle price documents creation
+    // Debug logging
+    console.log("Received withTravel:", withTravel);
+    console.log("Received withoutTravel:", withoutTravel);
+
     // Create and save Price document
     const price = new Price({
-      withTravel: {
-        description: withTravelDescription,
-        from: withTravelFrom,
-        to: withTravelTo,
-        price: withTravelPrice,
-      },
-      withoutTravel: {
-        description: withoutTravelDescription,
-        from: withoutTravelFrom,
-        to: withoutTravelTo,
-        price: withoutTravelPrice,
-      },
+      withTravel: Array.isArray(withTravel) ? withTravel : [withTravel], // Ensure it is an array
+      withoutTravel: Array.isArray(withoutTravel)
+        ? withoutTravel
+        : [withoutTravel], // Ensure it is an array
     });
-    await price.save();
+
+    try {
+      await price.save();
+      console.log("Saved price:", price);
+    } catch (error) {
+      console.error("Error saving price:", error);
+      throw new ApiError(400, "Failed to save price: " + error.message);
+    }
 
     // Ensure scheduleTimeline is an array
     const timelines = Array.isArray(scheduleTimeline)
       ? scheduleTimeline
-      : JSON.parse(scheduleTimeline);
+      : JSON.parse(scheduleTimeline || "[]");
 
     // Debug logging
     console.log("Timelines array to be saved:", timelines);
 
-    // Create and save TrekTimeline document with the entire scheduleTimeline array
+    // Create and save TrekTimeline document
     const trekTimeline = new TrekTimeline({
       scheduleTimeline: timelines,
     });
     await trekTimeline.save();
-
-    // Debug logging
     console.log("Saved trekTimeline:", trekTimeline);
 
     // Create and save TrekDate document
@@ -105,23 +103,21 @@ const addTrek = asyncHandler(async (req, res) => {
     const highlights = Array.isArray(trekHighlights)
       ? trekHighlights
       : JSON.parse(trekHighlights || "[]");
-
     const info = Array.isArray(trekInfo)
       ? trekInfo
       : JSON.parse(trekInfo || "[]");
-
     const inclusions = Array.isArray(trekInclusions)
       ? trekInclusions
       : JSON.parse(trekInclusions || "[]");
-
     const exclusions = Array.isArray(trekExclusions)
       ? trekExclusions
       : JSON.parse(trekExclusions || "[]");
-
     const cancellationPolicy = Array.isArray(trekCancellationPolicy)
       ? trekCancellationPolicy
       : JSON.parse(trekCancellationPolicy || "[]");
-
+    const subDescriptionForTrek = Array.isArray(subDescription)
+      ? subDescription
+      : JSON.parse(subDescription || "[]");
     const difficulty = trekDifficulty.toLowerCase();
 
     // Create and save Trek document
@@ -133,6 +129,7 @@ const addTrek = asyncHandler(async (req, res) => {
       trekLocation,
       trekHighlights: highlights,
       trekDescription,
+      subDescription: subDescriptionForTrek,
       trekType,
       trekInfo: info,
       trekInclusions: inclusions,
@@ -170,33 +167,16 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
 
   const { id } = req.params;
 
-  // Parse the scheduleTimeline field if it's a string
+  // Destructure the input fields
   let {
     startDate,
     endDate,
-    withTravelDescription,
-    withTravelFrom,
-    withTravelTo,
-    withTravelPrice,
-    withoutTravelDescription,
-    withoutTravelFrom = "", // Default to empty string
-    withoutTravelTo = "", // Default to empty string
-    withoutTravelPrice,
-    scheduleTimeline = "[]", // Default to empty array string
+    withTravel,
+    withoutTravel,
+    scheduleTimeline, // Expect this to be sent directly as an array
   } = req.body;
 
-  try {
-    scheduleTimeline = JSON.parse(scheduleTimeline);
-  } catch (error) {
-    return res.status(400).json({
-      statusCode: 400,
-      message: "Invalid scheduleTimeline format.",
-      data: null,
-      success: false,
-      errors: ["scheduleTimeline is not valid JSON"],
-    });
-  }
-
+  // Validate scheduleTimeline if it's an array
   const errors = [];
   if (!startDate) errors.push("Start Date is missing");
   if (!endDate) errors.push("End Date is missing");
@@ -227,23 +207,17 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
   session.startTransaction();
 
   try {
+    // Create new Price document
     const price = new Price({
-      withTravel: {
-        description: withTravelDescription,
-        from: withTravelFrom,
-        to: withTravelTo,
-        price: withTravelPrice,
-      },
-      withoutTravel: {
-        description: withoutTravelDescription,
-        from: withoutTravelFrom,
-        to: withoutTravelTo,
-        price: withoutTravelPrice,
-      },
+      withTravel: Array.isArray(withTravel) ? withTravel : [withTravel],
+      withoutTravel: Array.isArray(withoutTravel)
+        ? withoutTravel
+        : [withoutTravel],
     });
 
     await price.save({ session });
 
+    // Trim timelines for cleanliness
     const trimmedTimelines = scheduleTimeline.map((timeline) => ({
       day:
         typeof timeline.day === "string" ? timeline.day.trim() : timeline.day,
@@ -257,25 +231,27 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
           : timeline.work,
     }));
 
+    // Create new TrekTimeline document
     const trekTimeline = new TrekTimeline({
       scheduleTimeline: trimmedTimelines,
     });
 
     await trekTimeline.save({ session });
 
+    // Create new TrekDate document
     const trekDate = new TrekDate({
-      startDate,
-      endDate,
+      startDate: new Date(startDate), // Convert to Date object
+      endDate: new Date(endDate), // Convert to Date object
       trekTimeline: trekTimeline._id,
       price: price._id,
     });
 
     await trekDate.save({ session });
 
+    // Find the existing Trek document
     const existingTrek = await Trek.findById(id).session(session);
     if (!existingTrek) {
       await session.abortTransaction();
-      session.endSession();
       return res.status(404).json({
         statusCode: 404,
         message: "Trek not Found!",
@@ -285,12 +261,11 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
       });
     }
 
+    // Update the Trek document with the new date
     existingTrek.dates.push(trekDate._id);
     await existingTrek.save({ session });
 
     await session.commitTransaction();
-    session.endSession();
-
     res.status(201).json({
       statusCode: 201,
       message: "New trek date added successfully!",
@@ -300,7 +275,6 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    session.endSession();
     console.error("Error adding new date for trek:", error.message);
     res.status(500).json({
       statusCode: 500,
@@ -309,6 +283,8 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
       success: false,
       errors: [error.message],
     });
+  } finally {
+    session.endSession(); // Always end the session
   }
 });
 
@@ -392,6 +368,7 @@ const patchTrek = asyncHandler(async (req, res) => {
     altitude,
     trekLocation,
     trekDescription,
+    subDescription,
     trekInfo,
     trekHighlights,
     trekType,
@@ -425,6 +402,12 @@ const patchTrek = asyncHandler(async (req, res) => {
         ? trekHighlights
         : JSON.parse(trekHighlights);
     if (trekDescription) trek.trekDescription = trekDescription;
+
+    if (subDescription)
+      trek.subDescription = Array.isArray(subDescription)
+        ? subDescription
+        : JSON.parse(subDescription || "[]");
+
     if (trekInfo)
       trek.trekInfo = Array.isArray(trekInfo) ? trekInfo : JSON.parse(trekInfo);
     if (trekInclusions)
@@ -509,14 +492,8 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
   const {
     startDate,
     endDate,
-    withTravelDescription,
-    withTravelFrom,
-    withTravelTo,
-    withTravelPrice,
-    withoutTravelDescription,
-    withoutTravelFrom,
-    withoutTravelTo,
-    withoutTravelPrice,
+    withTravel, // Extracted directly from req.body
+    withoutTravel, // Extracted directly from req.body
     scheduleTimeline,
   } = req.body;
 
@@ -556,33 +533,20 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
       });
     }
 
-    if (
-      withTravelDescription ||
-      withTravelFrom ||
-      withTravelTo ||
-      withTravelPrice
-    ) {
-      price.withTravel = {
-        description: withTravelDescription || price.withTravel.description,
-        from: withTravelFrom || price.withTravel.from,
-        to: withTravelTo || price.withTravel.to,
-        price: withTravelPrice || price.withTravel.price,
-      };
+    // Update withTravel details
+    if (withTravel) {
+      const withTravelArray = Array.isArray(withTravel)
+        ? withTravel
+        : [withTravel];
+      price.withTravel = withTravelArray; // Update the entire withTravel array
     }
 
-    if (
-      withoutTravelDescription ||
-      withoutTravelFrom ||
-      withoutTravelTo ||
-      withoutTravelPrice
-    ) {
-      price.withoutTravel = {
-        description:
-          withoutTravelDescription || price.withoutTravel.description,
-        from: withoutTravelFrom || price.withoutTravel.from,
-        to: withoutTravelTo || price.withoutTravel.to,
-        price: withoutTravelPrice || price.withoutTravel.price,
-      };
+    // Update withoutTravel details
+    if (withoutTravel) {
+      const withoutTravelArray = Array.isArray(withoutTravel)
+        ? withoutTravel
+        : [withoutTravel];
+      price.withoutTravel = withoutTravelArray; // Update the entire withoutTravel array
     }
 
     // Find and update the TrekTimeline document
@@ -775,6 +739,7 @@ const aggregateTrekAllDetails = asyncHandler(async (req, res) => {
           trekLocation: 1,
           trekHighlights: 1,
           trekDescription: 1,
+          subDescription: 1,
           trekInfo: 1,
           trekInclusions: 1,
           trekExclusions: 1,
@@ -1765,6 +1730,7 @@ const aggregateTrekMainPageTrekData = asyncHandler(async (req, res) => {
           trekLocation: 1,
           trekHighlights: 1,
           trekDescription: 1,
+          subDescription: 1,
           trekInfo: 1,
           trekInclusions: 1,
           trekExclusions: 1,
