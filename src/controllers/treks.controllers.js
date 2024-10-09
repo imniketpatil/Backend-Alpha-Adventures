@@ -27,15 +27,24 @@ const addTrek = asyncHandler(async (req, res) => {
     trekCancellationPolicy,
     startDate,
     endDate,
-    withTravel, // Extracted directly from req.body
-    withoutTravel, // Extracted directly from req.body
+    withTravel, // Expecting an array of objects
+    withoutTravel, // Expecting an array of objects
     scheduleTimeline, // Expecting an array of { day, time, work } objects
   } = req.body;
 
-  // Debug logging
-  console.log("Received scheduleTimeline:", scheduleTimeline);
+  // Validate if withTravel and withoutTravel are parsed correctly
+  let travelWith = Array.isArray(withTravel)
+    ? withTravel
+    : JSON.parse(withTravel || "[]");
+  let travelWithout = Array.isArray(withoutTravel)
+    ? withoutTravel
+    : JSON.parse(withoutTravel || "[]");
 
-  // Extract and validate uploaded images
+  // Debug logging
+  console.log("Parsed withTravel:", travelWith);
+  console.log("Parsed withoutTravel:", travelWithout);
+
+  // Check if required images are present
   const trekImageLocalPaths = req.files?.trekImage?.map((file) => file.path);
   console.log("Local image paths:", trekImageLocalPaths);
 
@@ -54,17 +63,10 @@ const addTrek = asyncHandler(async (req, res) => {
       throw new ApiError(400, "One or more image files didn't upload");
     }
 
-    // Handle price documents creation
-    // Debug logging
-    console.log("Received withTravel:", withTravel);
-    console.log("Received withoutTravel:", withoutTravel);
-
     // Create and save Price document
     const price = new Price({
-      withTravel: Array.isArray(withTravel) ? withTravel : [withTravel], // Ensure it is an array
-      withoutTravel: Array.isArray(withoutTravel)
-        ? withoutTravel
-        : [withoutTravel], // Ensure it is an array
+      withTravel: travelWith,
+      withoutTravel: travelWithout,
     });
 
     try {
