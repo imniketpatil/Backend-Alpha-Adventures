@@ -32,13 +32,30 @@ const addTrek = asyncHandler(async (req, res) => {
     scheduleTimeline, // Expecting an array of { day, time, work } objects
   } = req.body;
 
-  // Validate if withTravel and withoutTravel are parsed correctly
-  let travelWith = Array.isArray(withTravel)
-    ? withTravel
-    : JSON.parse(withTravel || "[]");
-  let travelWithout = Array.isArray(withoutTravel)
-    ? withoutTravel
-    : JSON.parse(withoutTravel || "[]");
+  console.log("req.body", req.body);
+
+  // Safely handle the parsing of `withTravel` and `withoutTravel` arrays
+  let travelWith = [];
+  let travelWithout = [];
+
+  try {
+    travelWith = Array.isArray(withTravel)
+      ? withTravel
+      : typeof withTravel === "string"
+        ? JSON.parse(withTravel)
+        : [];
+
+    travelWithout = Array.isArray(withoutTravel)
+      ? withoutTravel
+      : typeof withoutTravel === "string"
+        ? JSON.parse(withoutTravel)
+        : [];
+  } catch (error) {
+    console.error("Error parsing withTravel/withoutTravel:", error.message);
+    return res.status(400).json({
+      message: "Invalid format for withTravel or withoutTravel fields",
+    });
+  }
 
   // Debug logging
   console.log("Parsed withTravel:", travelWith);
@@ -49,7 +66,9 @@ const addTrek = asyncHandler(async (req, res) => {
   console.log("Local image paths:", trekImageLocalPaths);
 
   if (!trekImageLocalPaths || trekImageLocalPaths.length === 0) {
-    throw new ApiError(400, "At least one image file is required");
+    return res
+      .status(400)
+      .json({ message: "At least one image file is required" });
   }
 
   try {
@@ -60,7 +79,9 @@ const addTrek = asyncHandler(async (req, res) => {
     console.log("Images uploaded to Cloudinary:", imagesOnCloudinary);
 
     if (!imagesOnCloudinary.every((image) => image)) {
-      throw new ApiError(400, "One or more image files didn't upload");
+      return res
+        .status(400)
+        .json({ message: "One or more image files didn't upload" });
     }
 
     // Create and save Price document
@@ -69,20 +90,23 @@ const addTrek = asyncHandler(async (req, res) => {
       withoutTravel: travelWithout,
     });
 
+    await price.save();
+    console.log("Saved price:", price);
+
+    // Ensure `scheduleTimeline` is an array
+    let timelines = [];
     try {
-      await price.save();
-      console.log("Saved price:", price);
+      timelines = Array.isArray(scheduleTimeline)
+        ? scheduleTimeline
+        : typeof scheduleTimeline === "string"
+          ? JSON.parse(scheduleTimeline)
+          : [];
     } catch (error) {
-      console.error("Error saving price:", error);
-      throw new ApiError(400, "Failed to save price: " + error.message);
+      return res
+        .status(400)
+        .json({ message: "Invalid format for scheduleTimeline field" });
     }
 
-    // Ensure scheduleTimeline is an array
-    const timelines = Array.isArray(scheduleTimeline)
-      ? scheduleTimeline
-      : JSON.parse(scheduleTimeline || "[]");
-
-    // Debug logging
     console.log("Timelines array to be saved:", timelines);
 
     // Create and save TrekTimeline document
@@ -146,21 +170,16 @@ const addTrek = asyncHandler(async (req, res) => {
     await newTrek.save();
 
     // Send a success response
-    res.status(201).json(
-      new ApiResponse({
-        message: "Trek added successfully",
-        data: newTrek,
-      })
-    );
+    res.status(201).json({
+      message: "Trek added successfully",
+      data: newTrek,
+    });
   } catch (error) {
-    // Handle errors and send error response
     console.error("Error adding trek:", error.message);
-    res.status(500).json(
-      new ApiError({
-        message: "An error occurred while adding the trek",
-        error: error.message,
-      })
-    );
+    res.status(500).json({
+      message: "An error occurred while adding the trek",
+      error: error.message,
+    });
   }
 });
 
@@ -178,11 +197,17 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
     scheduleTimeline, // Expect this to be sent directly as an array
   } = req.body;
 
-  // Validate scheduleTimeline if it's an array
+  // Initialize an array to collect validation errors
   const errors = [];
+
+  // Validate date fields
   if (!startDate) errors.push("Start Date is missing");
   if (!endDate) errors.push("End Date is missing");
+  if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
+    errors.push("Start Date must be before End Date");
+  }
 
+  // Validate scheduleTimeline
   if (!Array.isArray(scheduleTimeline)) {
     errors.push("Schedule Timeline should be an array");
   } else if (scheduleTimeline.length === 0) {
@@ -195,16 +220,18 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
     });
   }
 
+  // If there are validation errors, return a 400 Bad Request response
   if (errors.length > 0) {
     return res.status(400).json({
       statusCode: 400,
-      message: "Required fields are missing or scheduleTimeline is empty!",
+      message: "Validation failed",
       data: null,
       success: false,
       errors,
     });
   }
 
+  // Start a MongoDB session and transaction
   const session = await Trek.startSession();
   session.startTransaction();
 
@@ -219,26 +246,27 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
 
     await price.save({ session });
 
-    // Trim timelines for cleanliness
-    const trimmedTimelines = scheduleTimeline.map((timeline) => ({
-      day:
-        typeof timeline.day === "string" ? timeline.day.trim() : timeline.day,
-      time:
-        typeof timeline.time === "string"
-          ? timeline.time.trim()
-          : timeline.time,
-      work:
-        typeof timeline.work === "string"
-          ? timeline.work.trim()
-          : timeline.work,
-    }));
+    // Check if scheduleTimeline is an array and handle if it's a string
+    let timelines = Array.isArray(scheduleTimeline) ? scheduleTimeline : [];
 
-    // Create new TrekTimeline document
+    if (typeof scheduleTimeline === "string") {
+      try {
+        timelines = JSON.parse(scheduleTimeline);
+      } catch (error) {
+        return res
+          .status(400)
+          .json({ message: "Invalid format for scheduleTimeline field" });
+      }
+    }
+
+    console.log("Timelines array to be saved:", timelines);
+
+    // Create and save TrekTimeline document
     const trekTimeline = new TrekTimeline({
-      scheduleTimeline: trimmedTimelines,
+      scheduleTimeline: timelines,
     });
-
     await trekTimeline.save({ session });
+    console.log("Saved trekTimeline:", trekTimeline);
 
     // Create new TrekDate document
     const trekDate = new TrekDate({
@@ -256,7 +284,7 @@ const addNewDateForTrek = asyncHandler(async (req, res) => {
       await session.abortTransaction();
       return res.status(404).json({
         statusCode: 404,
-        message: "Trek not Found!",
+        message: "Trek not found!",
         data: null,
         success: false,
         errors: [],
@@ -499,11 +527,35 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
     scheduleTimeline,
   } = req.body;
 
+  let travelWith = [];
+  let travelWithout = [];
+
+  // Parsing withTravel and withoutTravel to handle both array and JSON string formats
+  try {
+    travelWith = Array.isArray(withTravel)
+      ? withTravel
+      : typeof withTravel === "string"
+        ? JSON.parse(withTravel)
+        : [];
+
+    travelWithout = Array.isArray(withoutTravel)
+      ? withoutTravel
+      : typeof withoutTravel === "string"
+        ? JSON.parse(withoutTravel)
+        : [];
+  } catch (error) {
+    console.error("Error parsing withTravel/withoutTravel:", error.message);
+    return res.status(400).json({
+      message: "Invalid format for withTravel or withoutTravel fields",
+    });
+  }
+
+  // Start a MongoDB session and transaction
   const session = await TrekDate.startSession();
   session.startTransaction();
 
   try {
-    // Find the existing TrekDate document by ID
+    // Fetch the existing TrekDate document by ID
     const trekDate = await TrekDate.findById(id).session(session);
     if (!trekDate) {
       await session.abortTransaction();
@@ -517,11 +569,11 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
       });
     }
 
-    // Update TrekDate fields
+    // Update startDate and endDate if provided
     if (startDate) trekDate.startDate = new Date(startDate);
     if (endDate) trekDate.endDate = new Date(endDate);
 
-    // Find and update the Price document
+    // Fetch and update the Price document associated with the trek
     const price = await Price.findById(trekDate.price).session(session);
     if (!price) {
       await session.abortTransaction();
@@ -535,23 +587,16 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
       });
     }
 
-    // Update withTravel details
-    if (withTravel) {
-      const withTravelArray = Array.isArray(withTravel)
-        ? withTravel
-        : [withTravel];
-      price.withTravel = withTravelArray; // Update the entire withTravel array
+    // Update the withTravel and withoutTravel details in the Price document
+    if (travelWith.length) {
+      price.withTravel = travelWith;
     }
 
-    // Update withoutTravel details
-    if (withoutTravel) {
-      const withoutTravelArray = Array.isArray(withoutTravel)
-        ? withoutTravel
-        : [withoutTravel];
-      price.withoutTravel = withoutTravelArray; // Update the entire withoutTravel array
+    if (travelWithout.length) {
+      price.withoutTravel = travelWithout;
     }
 
-    // Find and update the TrekTimeline document
+    // Fetch and update the TrekTimeline document associated with the trek
     const trekTimeline = await TrekTimeline.findById(
       trekDate.trekTimeline[0]
     ).session(session);
@@ -567,6 +612,7 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
       });
     }
 
+    // Update scheduleTimeline if provided
     if (scheduleTimeline) {
       trekTimeline.scheduleTimeline = Array.isArray(scheduleTimeline)
         ? scheduleTimeline
@@ -578,10 +624,11 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
     await trekTimeline.save({ session });
     await trekDate.save({ session });
 
+    // Commit the transaction
     await session.commitTransaction();
     session.endSession();
 
-    // Send a success response
+    // Return a success response
     res.status(200).json({
       statusCode: 200,
       message: "TrekDate details updated successfully",
@@ -590,6 +637,7 @@ const patchDatesDetails = asyncHandler(async (req, res) => {
       errors: [],
     });
   } catch (error) {
+    // Abort the transaction if there's an error
     await session.abortTransaction();
     session.endSession();
     console.error("Error updating TrekDate details:", error.message);
